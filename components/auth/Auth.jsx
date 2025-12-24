@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useRef } from 'react'
-import * as LucideIcons from "lucide-react" // Sab icons ek saath import
+import * as LucideIcons from "lucide-react" 
 import { motion } from "framer-motion"
 
 const FinalCheckBackground = () => {
