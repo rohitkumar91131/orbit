@@ -5,8 +5,8 @@ import HabitList from "@/components/Habits/HabitList"
 import AddHabit from "@/components/Habits/AddHabit"
 import { Progress } from "@/components/ui/progress"
 import { format } from "date-fns"
-import { useHabits } from "../../app/context/HabitContext"
 import { SessionProvider } from "next-auth/react"
+import { useHabits } from "@/app/context/HabitContext"
 
 export default function HabitsWrapper() {
   const { habits, date, fetchHabits } = useHabits()

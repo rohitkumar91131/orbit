@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const HabitSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User", 
+    ref: "User",
     required: true,
   },
   title: {
@@ -11,19 +11,6 @@ const HabitSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-  startTime: {
-    type: String, 
-    required: true,
-  },
-  endTime: {
-    type: String,
-    required: true,
-  },
-  completedDates: [
-    {
-      type: String, 
-    }
-  ],
   streak: {
     type: Number,
     default: 0,

@@ -1,54 +1,64 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
 export async function POST(req) {
   try {
-    const body = await req.json();
+    const body = await req.json()
 
-    const title = body.title || "Unknown Habit";
-    const streak = Number(body.streak) || 0;
-    const completedDates = Array.isArray(body.completedDates)
-      ? body.completedDates
-      : [];
+    const title = body.title || "Habit"
+    const streak = Number(body.streak) || 0
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash"
-    });
+    let situation = "Encourage them to keep going."
+    if (streak === 0) {
+      situation = "User has broken the streak or is just starting. Tell them it's okay to restart today. Don't be rude."
+    } else if (streak > 5) {
+      situation = "User is on a roll! Highly praise their consistency."
+    }
 
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: "user",
-          parts: [
+    const prompt = `
+Act as a supportive Indian friend (Desi friend).
+
+User's Habit: "${title}"
+Current Streak: ${streak} days.
+Situation: ${situation}
+
+Task: Write a very short, punchy motivation line in Hinglish.
+Tone: Casual, real, best-friend type.
+
+Constraints:
+1. Max 2 sentences.
+2. NO emojis.
+3. Daily spoken language only.
+    `.trim()
+
+    const apiKey = process.env.GEMINI_API_KEY
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          contents: [
             {
-              text: `
-You are a friendly habit coach.
-
-Habit: ${title}
-Current streak: ${streak} days
-Total completions: ${completedDates.length}
-
-Give 2 short motivating lines in Hinglish.
-No emojis. Real human tone.
-              `
+              parts: [{ text: prompt }]
             }
           ]
-        }
-      ]
-    });
+        })
+      }
+    )
 
-    const response = result.response;
+    const data = await res.json()
 
-    return Response.json({
-      review: response.text(),
-      raw: response
-    });
+    const text =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
+      "Aaj se dubara shuru kar, bas wahi kaafi hai."
 
+    return Response.json({ review: text })
   } catch (err) {
+    console.error(err)
     return Response.json(
-      { error: err.message },
+      { error: "Failed to generate motivation." },
       { status: 500 }
-    );
+    )
   }
 }
