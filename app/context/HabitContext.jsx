@@ -1,23 +1,18 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, useMemo } from "react"
+import { createContext, useContext, useState, useCallback } from "react"
 import { format, isSameDay } from "date-fns"
 import { toast } from "sonner" 
 
 const HabitContext = createContext(null)
 
 export function HabitProvider({ children }) {
-  // --- State ---
   const [date, setDate] = useState(new Date()) 
   const [habits, setHabits] = useState([])
-  
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [activeHabit, setActiveHabit] = useState(null)
 
-  // --- Actions ---
-
-  // 1. Fetch Habits (Memoized)
+  // 1. Fetch Habits
   const fetchHabits = useCallback(async () => {
     try {
       const res = await fetch("/api/habits")
@@ -26,12 +21,11 @@ export function HabitProvider({ children }) {
       setHabits(data)
     } catch (e) {
       console.error("Error fetching habits:", e)
-      toast.error("Could not load habits")
     }
   }, []) 
 
   // 2. Add Habit
-  const addHabit = useCallback(async (payload) => {
+  const addHabit = async (payload) => {
     try {
       const res = await fetch("/api/habits", {
         method: "POST",
@@ -39,10 +33,8 @@ export function HabitProvider({ children }) {
         body: JSON.stringify(payload),
       })
       const data = await res.json()
-      
       if (!res.ok) throw new Error(data.error || "Failed to add habit")
       
-      // Update State
       setHabits((prev) => [data, ...prev])
       return data
     } catch (e) {
@@ -50,10 +42,10 @@ export function HabitProvider({ children }) {
       toast.error("Failed to add habit")
       throw e
     }
-  }, [])
+  }
 
   // 3. Update Habit
-  const updateHabit = useCallback(async (id, updatedData) => {
+  const updateHabit = async (id, updatedData) => {
     try {
       const res = await fetch(`/api/habits/${id}`, {
         method: "PUT", 
@@ -61,7 +53,6 @@ export function HabitProvider({ children }) {
         body: JSON.stringify(updatedData),
       })
       const data = await res.json()
-      
       if (!res.ok) throw new Error(data.error || "Update failed")
 
       setHabits((prev) => prev.map((h) => (h._id === id ? { ...h, ...data } : h)))
@@ -70,31 +61,28 @@ export function HabitProvider({ children }) {
       console.error(e)
       toast.error("Update failed")
     }
-  }, [])
+  }
 
   // 4. Delete Habit
-  const deleteHabit = useCallback(async (id) => {
-    // Optimistic Delete
-    const previousHabits = [...habits]
-    setHabits((prev) => prev.filter((h) => h._id !== id))
-
+  const deleteHabit = async (id) => {
     try {
+      setHabits((prev) => prev.filter((h) => h._id !== id))
       const res = await fetch(`/api/habits/${id}`, { method: "DELETE" })
       if (!res.ok) throw new Error("Delete failed")
       toast.success("Habit deleted")
     } catch (e) {
       console.error(e)
-      setHabits(previousHabits) // Revert on fail
+      fetchHabits() // Revert
       toast.error("Delete failed")
     }
-  }, [habits]) 
+  }
 
-  // 5. Toggle Habit
-  const toggleHabit = useCallback(async (id) => {
+  // 5. Toggle Habit (FIXED: URL sahi kar diya hai)
+  const toggleHabit = async (id) => {
     const selectedDateStr = format(date, "yyyy-MM-dd")
-    const previousHabits = [...habits]
+    const oldHabits = [...habits]
 
-    // Optimistic UI Update
+    // 1. UI Update (Turant Tick dikhayega)
     setHabits((prev) =>
       prev.map((h) => {
         if (h._id !== id) return h
@@ -107,175 +95,44 @@ export function HabitProvider({ children }) {
     )
 
     try {
+      // 2. API Call (URL Fixed: Ab '/toggle' nahi lagayenge)
       const res = await fetch(`/api/habits/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: selectedDateStr }),
       })
       
-      if (!res.ok) throw new Error("Failed to toggle")
+      if (!res.ok) {
+        throw new Error("Failed to toggle")
+      }
+
+      // 3. Success: Server ka data sync karo
       const data = await res.json()
-      
-      // Sync with Server (Updates Streak & Dates)
       setHabits(prev => prev.map(h => 
         h._id === id ? { ...h, completedDates: data.completedDates, streak: data.newStreak } : h
       ))
 
     } catch (error) {
       console.error("Toggle error:", error)
-      setHabits(previousHabits) 
+      // 4. Error: Wapas purani state par le aao (Tick hata do)
+      setHabits(oldHabits) 
       toast.error("Failed to update status")
     }
-  }, [habits, date])
+  }
 
-  // 6. Save Journal (NEW)
-  const saveJournal = useCallback(async (habitId, journalText) => {
-    const selectedDateStr = format(date, "yyyy-MM-dd")
-    
-    try {
-      const res = await fetch(`/api/habits/${habitId}/log`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-            date: selectedDateStr, 
-            journal: journalText 
-        }),
-      })
-      
-      if(!res.ok) throw new Error("Failed to save")
-      
-      const { log } = await res.json()
-
-      // Update Habits List
-      setHabits(prev => prev.map(h => {
-        if(h._id !== habitId) return h;
-        
-        // Logs array update logic
-        const existingLogIndex = (h.logs || []).findIndex(l => l.date === selectedDateStr)
-        let newLogs = [...(h.logs || [])]
-        
-        if(existingLogIndex > -1) {
-            newLogs[existingLogIndex] = { ...newLogs[existingLogIndex], journal: journalText }
-        } else {
-            newLogs.push(log) 
-        }
-        
-        // Sync Active Habit if open
-        if(activeHabit && activeHabit._id === habitId) {
-            setActiveHabit(curr => ({...curr, logs: newLogs}))
-        }
-
-        return { ...h, logs: newLogs }
-      }))
-
-      toast.success("Journal saved")
-    } catch (error) {
-      console.error(error)
-      toast.error("Could not save journal")
-    }
-  }, [date, activeHabit])
-
-  // 7. Delete Log (NEW)
-  const deleteHabitLog = useCallback(async (habitId) => {
-    const selectedDateStr = format(date, "yyyy-MM-dd")
-
-    try {
-      const res = await fetch(`/api/habits/${habitId}/log`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: selectedDateStr }),
-      })
-
-      if (!res.ok) throw new Error("Failed to delete log")
-      
-      const data = await res.json() // returns { newStreak, message }
-
-      // Update Habits List
-      setHabits((prev) => 
-        prev.map((h) => {
-          if (h._id !== habitId) return h
-          
-          const updatedLogs = (h.logs || []).filter(l => l.date !== selectedDateStr)
-          const updatedDates = h.completedDates.filter(d => d !== selectedDateStr)
-
-          // Sync Active Habit if open
-          if(activeHabit && activeHabit._id === habitId) {
-            setActiveHabit(curr => ({
-                ...curr, 
-                streak: data.newStreak,
-                logs: updatedLogs,
-                completedDates: updatedDates
-            }))
-          }
-
-          return {
-            ...h,
-            streak: data.newStreak,
-            logs: updatedLogs,
-            completedDates: updatedDates
-          }
-        })
-      )
-      
-      toast.success("Entry cleared for today")
-
-    } catch (error) {
-      console.error(error)
-      toast.error("Could not clear entry")
-    }
-  }, [date, activeHabit])
-
-
-  // --- Helpers ---
-  const setToday = useCallback(() => setDate(new Date()), [])
-  
-  const isSelectedDate = useCallback((compareDate) => {
-    return isSameDay(date, compareDate)
-  }, [date])
-
-  const openHabitModal = useCallback((habit) => { 
-    setActiveHabit(habit)
-    setIsModalOpen(true) 
-  }, [])
-
-  const closeHabitModal = useCallback(() => { 
-    setIsModalOpen(false)
-    setTimeout(() => setActiveHabit(null), 400) 
-  }, [])
-
-  // --- MEMOIZED VALUE ---
-  const value = useMemo(() => ({
-    // State
-    date,
-    habits,
-    isModalOpen,
-    activeHabit,
-    
-    // Setters
-    setDate,
-    
-    // Actions
-    fetchHabits,
-    addHabit,
-    updateHabit,
-    deleteHabit,
-    toggleHabit,
-    saveJournal,     // Added
-    deleteHabitLog,  // Added
-    
-    // Helpers
-    setToday,
-    isSelectedDate,
-    openHabitModal,
-    closeHabitModal
-  }), [
-    date, habits, isModalOpen, activeHabit, 
-    fetchHabits, addHabit, updateHabit, deleteHabit, toggleHabit, saveJournal, deleteHabitLog,
-    setToday, isSelectedDate, openHabitModal, closeHabitModal
-  ])
+  const setToday = () => setDate(new Date())
+  const isSelectedDate = (compareDate) => isSameDay(date, compareDate)
+  const openHabitModal = (habit) => { setActiveHabit(habit); setIsModalOpen(true) }
+  const closeHabitModal = () => { setIsModalOpen(false); setTimeout(() => setActiveHabit(null), 400) }
 
   return (
-    <HabitContext.Provider value={value}>
+    <HabitContext.Provider
+      value={{
+        date, setDate, setToday, isSelectedDate,
+        habits, fetchHabits, addHabit, updateHabit, deleteHabit, toggleHabit,
+        isModalOpen, activeHabit, openHabitModal, closeHabitModal,
+      }}
+    >
       {children}
     </HabitContext.Provider>
   )

@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"; // Path fixed using @ alias
+import { authOptions } from "../auth/[...nextauth]/route";
 import connectDB from "@/app/lib/db";
-import Habit from "@/app/src/models/Habit"; 
+import Habit from "@/app/src/models/Habit"; // Ensure path matches your folder structure
 
 export async function POST(req) {
   const session = await getServerSession(authOptions);
@@ -18,18 +18,16 @@ export async function POST(req) {
   }
 
   try {
-    // 1. Create Habit (Updated Schema ke hisab se)
+    // 1. Create Simple Habit
+    // No startTime, No endTime, No AI
     const habit = await Habit.create({
       userId: session.user.id,
       title: body.title,
-      completedDates: [], // Default empty
-      logs: [],           // Default empty
-      streak: 0           // Default 0
+      completedDates: [] // Shuru mein khali rahega
     });
 
     return Response.json(habit);
   } catch (error) {
-    console.error("Create Habit Error:", error);
     return Response.json({ error: "Failed to create habit" }, { status: 500 });
   }
 }
@@ -44,14 +42,12 @@ export async function GET() {
 
   try {
     // 2. Fetch Habits
-    // Kyunki ab sara data (logs, completedDates) Habit model ke andar hi hai,
-    // Humein koi complex Join/Lookup karne ki zaroorat nahi hai.
+    // HabitLog merge karne ki zaroorat nahi, data ab 'completedDates' array mein hai
     const habits = await Habit.find({ userId: session.user.id })
-      .sort({ createdAt: -1 }); // Newest habits top par
+      .sort({ createdAt: -1 }); // Newest first
 
     return Response.json(habits);
   } catch (error) {
-    console.error("Fetch Habit Error:", error);
     return Response.json({ error: "Failed to fetch habits" }, { status: 500 });
   }
 }
