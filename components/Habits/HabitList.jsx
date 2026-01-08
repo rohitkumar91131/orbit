@@ -10,14 +10,7 @@ import { cn } from "@/lib/utils"
 export default function HabitList() {
   const { habits, toggleHabit, date, openHabitModal } = useHabits()
 
-  // Context se jo 'date' aayi hai (Calendar selected date)
   const selectedDateStr = format(date, "yyyy-MM-dd")
-
-  // UPDATE: Ab sirf Time ke hisab se sort hoga (Chronological Order)
-  // Chahe complete ho ya na ho, subah wali habit upar hi rahegi.
-  const sortedHabits = [...habits].sort((a, b) => {
-    return (a.startTime || "").localeCompare(b.startTime || "")
-  })
 
   return (
     <>
@@ -25,8 +18,8 @@ export default function HabitList() {
         {/* Timeline Line */}
         <div className="absolute left-[19px] top-2 bottom-2 w-0.5 bg-gradient-to-b from-purple-500/50 via-indigo-400/30 to-transparent" />
 
-        {sortedHabits.map(habit => {
-          // Check: Kya habit ke 'completedDates' array me 'selectedDate' hai?
+        {/* Change: sortedHabits -> habits */}
+        {habits.map(habit => {
           const isCompletedOnSelectedDate = habit.completedDates?.includes(selectedDateStr)
 
           return (
@@ -51,18 +44,21 @@ export default function HabitList() {
                 className={cn(
                   "flex items-center justify-between p-5 rounded-3xl cursor-pointer transition-all duration-300 border backdrop-blur-sm",
                   isCompletedOnSelectedDate 
-                    ? "bg-purple-50/50 border-purple-200 opacity-80" // Completed Style
-                    : "bg-background/80 shadow-sm border-transparent hover:shadow-lg hover:-translate-y-0.5" // Active Style
+                    ? "bg-purple-50/50 border-purple-200 opacity-80" 
+                    : "bg-background/80 shadow-sm border-transparent hover:shadow-lg hover:-translate-y-0.5"
                 )}
               >
                 <div className="flex items-center gap-5">
-                  <div className={cn(
-                    "hidden md:flex flex-col items-center pr-5 border-r transition-colors",
-                    isCompletedOnSelectedDate ? "border-purple-200/50" : "border-border"
-                  )}>
-                    <span className="text-sm font-black text-foreground/80">{habit.startTime}</span>
-                    <span className="text-[10px] text-muted-foreground font-medium">TIME</span>
-                  </div>
+                  
+                  {habit.startTime && (
+                    <div className={cn(
+                        "hidden md:flex flex-col items-center pr-5 border-r transition-colors",
+                        isCompletedOnSelectedDate ? "border-purple-200/50" : "border-border"
+                    )}>
+                        <span className="text-sm font-black text-foreground/80">{habit.startTime}</span>
+                        <span className="text-[10px] text-muted-foreground font-medium">TIME</span>
+                    </div>
+                  )}
 
                   <div>
                     <h3 className={cn(
@@ -92,7 +88,7 @@ export default function HabitList() {
                   <div 
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleHabit(habit._id); // Ab ye 'selectedDateStr' use karega Context ke andar
+                      toggleHabit(habit._id); 
                     }}
                     className="p-2 -m-2 cursor-pointer"
                   >

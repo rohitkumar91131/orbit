@@ -8,21 +8,12 @@ const HabitSchema = new mongoose.Schema({
   },
   title: {
     type: String,
-    required: true,
-    trim: true,
+    required: true, 
   },
-  streak: {
-    type: Number,
-    default: 0,
-  },
-  syncToCalendar: {
-    type: Boolean,
-    default: false,
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  completedDates: {
+    type: [String], 
+    default: [],
+  }
+}, { timestamps: true });
 
 export default mongoose.models.Habit || mongoose.model("Habit", HabitSchema);

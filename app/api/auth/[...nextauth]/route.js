@@ -10,15 +10,6 @@ export const authOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      authorization: {
-        params: {
-          // calendar.events scope zaroori hai event insert karne ke liye
-          scope: "openid email profile https://www.googleapis.com/auth/calendar.events",
-          prompt: "consent",
-          access_type: "offline",
-          response_type: "code",
-        },
-      },
     }),
   ],
   session: {
@@ -26,17 +17,15 @@ export const authOptions = {
   },
   callbacks: {
     async jwt({ token, account, user }) {
-      // Login ke waqt token mein data store karo
       if (account) {
         token.accessToken = account.access_token;
       }
       if (user) {
-        token.id = user.id; // Database User ID
+        token.id = user.id;
       }
       return token;
     },
     async session({ session, token }) {
-      // Frontend ko access token aur user id pass karo
       session.accessToken = token.accessToken;
       if (token.id) {
         session.user.id = token.id;
@@ -46,7 +35,7 @@ export const authOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
-    signIn: '/login', // Agar custom login page hai toh
+    signIn: '/login',
   }
 };
 
