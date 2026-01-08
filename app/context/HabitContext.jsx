@@ -87,16 +87,14 @@ export function HabitProvider({ children }) {
       setHabits(previousHabits) // Revert on fail
       toast.error("Delete failed")
     }
-  }, [habits]) // Depends on habits for snapshot
+  }, [habits]) 
 
   // 5. Toggle Habit
   const toggleHabit = useCallback(async (id) => {
     const selectedDateStr = format(date, "yyyy-MM-dd")
-    
-    // Create a snapshot for reverting if API fails
     const previousHabits = [...habits]
 
-    // 1. Optimistic UI Update
+    // Optimistic UI Update
     setHabits((prev) =>
       prev.map((h) => {
         if (h._id !== id) return h
@@ -109,7 +107,6 @@ export function HabitProvider({ children }) {
     )
 
     try {
-      // 2. API Call
       const res = await fetch(`/api/habits/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -117,20 +114,117 @@ export function HabitProvider({ children }) {
       })
       
       if (!res.ok) throw new Error("Failed to toggle")
-
       const data = await res.json()
       
-      // 3. Sync with Server (Updates Streak & Dates)
+      // Sync with Server (Updates Streak & Dates)
       setHabits(prev => prev.map(h => 
         h._id === id ? { ...h, completedDates: data.completedDates, streak: data.newStreak } : h
       ))
 
     } catch (error) {
       console.error("Toggle error:", error)
-      setHabits(previousHabits) // 4. Revert to snapshot
+      setHabits(previousHabits) 
       toast.error("Failed to update status")
     }
-  }, [habits, date]) // Re-create function if habits or date changes
+  }, [habits, date])
+
+  // 6. Save Journal (NEW)
+  const saveJournal = useCallback(async (habitId, journalText) => {
+    const selectedDateStr = format(date, "yyyy-MM-dd")
+    
+    try {
+      const res = await fetch(`/api/habits/${habitId}/log`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+            date: selectedDateStr, 
+            journal: journalText 
+        }),
+      })
+      
+      if(!res.ok) throw new Error("Failed to save")
+      
+      const { log } = await res.json()
+
+      // Update Habits List
+      setHabits(prev => prev.map(h => {
+        if(h._id !== habitId) return h;
+        
+        // Logs array update logic
+        const existingLogIndex = (h.logs || []).findIndex(l => l.date === selectedDateStr)
+        let newLogs = [...(h.logs || [])]
+        
+        if(existingLogIndex > -1) {
+            newLogs[existingLogIndex] = { ...newLogs[existingLogIndex], journal: journalText }
+        } else {
+            newLogs.push(log) 
+        }
+        
+        // Sync Active Habit if open
+        if(activeHabit && activeHabit._id === habitId) {
+            setActiveHabit(curr => ({...curr, logs: newLogs}))
+        }
+
+        return { ...h, logs: newLogs }
+      }))
+
+      toast.success("Journal saved")
+    } catch (error) {
+      console.error(error)
+      toast.error("Could not save journal")
+    }
+  }, [date, activeHabit])
+
+  // 7. Delete Log (NEW)
+  const deleteHabitLog = useCallback(async (habitId) => {
+    const selectedDateStr = format(date, "yyyy-MM-dd")
+
+    try {
+      const res = await fetch(`/api/habits/${habitId}/log`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: selectedDateStr }),
+      })
+
+      if (!res.ok) throw new Error("Failed to delete log")
+      
+      const data = await res.json() // returns { newStreak, message }
+
+      // Update Habits List
+      setHabits((prev) => 
+        prev.map((h) => {
+          if (h._id !== habitId) return h
+          
+          const updatedLogs = (h.logs || []).filter(l => l.date !== selectedDateStr)
+          const updatedDates = h.completedDates.filter(d => d !== selectedDateStr)
+
+          // Sync Active Habit if open
+          if(activeHabit && activeHabit._id === habitId) {
+            setActiveHabit(curr => ({
+                ...curr, 
+                streak: data.newStreak,
+                logs: updatedLogs,
+                completedDates: updatedDates
+            }))
+          }
+
+          return {
+            ...h,
+            streak: data.newStreak,
+            logs: updatedLogs,
+            completedDates: updatedDates
+          }
+        })
+      )
+      
+      toast.success("Entry cleared for today")
+
+    } catch (error) {
+      console.error(error)
+      toast.error("Could not clear entry")
+    }
+  }, [date, activeHabit])
+
 
   // --- Helpers ---
   const setToday = useCallback(() => setDate(new Date()), [])
@@ -149,7 +243,7 @@ export function HabitProvider({ children }) {
     setTimeout(() => setActiveHabit(null), 400) 
   }, [])
 
-  // --- MEMOIZED VALUE (Prevents Unnecessary Re-renders) ---
+  // --- MEMOIZED VALUE ---
   const value = useMemo(() => ({
     // State
     date,
@@ -166,6 +260,8 @@ export function HabitProvider({ children }) {
     updateHabit,
     deleteHabit,
     toggleHabit,
+    saveJournal,     // Added
+    deleteHabitLog,  // Added
     
     // Helpers
     setToday,
@@ -173,9 +269,9 @@ export function HabitProvider({ children }) {
     openHabitModal,
     closeHabitModal
   }), [
-    date, habits, isModalOpen, activeHabit, // Data
-    fetchHabits, addHabit, updateHabit, deleteHabit, toggleHabit, // Functions
-    setToday, isSelectedDate, openHabitModal, closeHabitModal // Helpers
+    date, habits, isModalOpen, activeHabit, 
+    fetchHabits, addHabit, updateHabit, deleteHabit, toggleHabit, saveJournal, deleteHabitLog,
+    setToday, isSelectedDate, openHabitModal, closeHabitModal
   ])
 
   return (
