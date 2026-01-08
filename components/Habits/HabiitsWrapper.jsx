@@ -13,7 +13,6 @@ export default function HabitsWrapper() {
 
   useEffect(() => {
     fetchHabits()
-    // Empty dependency [] stops the infinite loop
   }, []) 
 
   const todayStr = format(date, "yyyy-MM-dd")
