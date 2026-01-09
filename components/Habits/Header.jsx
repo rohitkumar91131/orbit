@@ -1,12 +1,12 @@
 "use client"
 
 import { format, isToday, isYesterday, isTomorrow, addDays, subDays } from "date-fns"
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react"
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, LogOut } from "lucide-react" // LogOut Icon added
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { useHabits } from "@/app/context/HabitContext"
-import { useSession } from "next-auth/react"
+import { useSession, signOut } from "next-auth/react" // signOut added
 import { cn } from "@/lib/utils"
 
 export default function Header() {
@@ -15,7 +15,7 @@ export default function Header() {
 
   const name = session?.user?.name?.split(" ")[0] || "User"
   
-  // Calculate completed count for the specific day
+  // Calculate completed count
   const selectedDateStr = format(date, "yyyy-MM-dd")
   const totalHabits = habits.length
   const completedCount = habits.filter(h => h.completedDates?.includes(selectedDateStr)).length
@@ -30,16 +30,29 @@ export default function Header() {
   return (
     <div className="flex flex-col gap-2 mb-8">
       
-      {/* Top Row: Name (Left) & Date Selector (Right) */}
+      {/* Top Row: Greeting + Logout (Left) & Date Selector (Right) */}
       <div className="flex items-center justify-between">
         
-        {/* Greeting */}
-        <h1 className="text-2xl md:text-3xl font-black text-zinc-900 tracking-tighter truncate max-w-[50%]">
-          Hi, {name} <span className="hidden sm:inline-block">👋</span>
-        </h1>
+        {/* Left Side: Name & Logout */}
+        <div className="flex items-center gap-2 overflow-hidden">
+          <h1 className="text-2xl md:text-3xl font-black text-zinc-900 tracking-tighter truncate">
+            Hi, {name}
+          </h1>
+          
+          {/* Logout Button */}
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => signOut()} // NextAuth Logout Function
+            className="h-8 w-8 rounded-full text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
+            title="Log out"
+          >
+            <LogOut className="w-4 h-4" />
+          </Button>
+        </div>
 
-        {/* Date Selector - Compact & Pill Shaped */}
-        <div className="flex items-center bg-white p-1 rounded-full shadow-sm border border-zinc-200/80">
+        {/* Right Side: Date Selector (Compact & Pill Shaped) */}
+        <div className="flex items-center bg-white p-1 rounded-full shadow-sm border border-zinc-200/80 shrink-0 ml-2">
           
           <Button 
             variant="ghost" 
